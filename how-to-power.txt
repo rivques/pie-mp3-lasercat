@@ -1,0 +1,35 @@
+There are 4 major components that need power:
+Motors - 160mA-1.5A@7.2V per https://www.digikey.com/en/products/detail/seeed-technology-co-ltd/114090050/10385087 - probably 600-1000ma total under load @9-12V?
+Arduino - ~100mA@5V
+Raspberry Pi Zero 2 W - 200-400mA@5V per https://www.cnx-software.com/2021/12/09/raspberry-pi-zero-2-w-power-consumption/
+Camera - ~100mAish per https://forums.raspberrypi.com/viewtopic.php?t=347469
+
+The camera must be connected to the raspi, so they have a combined power draw of 300-500mA@5V.
+A 9V battery cannot power the motors, per https://learn.adafruit.com/adafruit-motor-shield-v2-for-arduino/powering-motors, and it is strongly recommended that they be on a separate supply from everything else, or at least very isolated.
+If the Arduino and raspi communicate over USB serial, they will share power unless we specifically cut VBUS.
+So that leaves:
+
+Motors: 300-1000mA@5-9V
+Everything else: 400-600mA@5V
+
+Available power sources:
+12V@>1.5A PIE-supplied wallwart. Must be plugged into wall.
+11.1V@55A 3S LiPo. Needs charged, must be wary of short, fuse ideal.
+6-9V@2ishA 4-6xAA battery pack. Would have to acquire.
+9V@300mA? 9V battery.
+5V@2.4A USB power bank. Bulky. 
+5V@1A Arduino onboard regulator. Needs 6.5-12V input.
+5V@1.5A external LM7805 regulator. Needs 6.5-12V input.
+
+Options:
+Easiest: 12V from PIE supply to motors and arduino regulator, raspi and cam backpowered over USB. Overvolts motors.
+Easy portable: 5V from USB power bank to raspi, arduino powered over raspi. 5V from USB power bank to motors w/ cut USB cable. Pros: Have everything on hand. Cons: only 0.5m/s, need to cut cable.
+Faster portable: 6xAA to Arduino regulator. CHS-style 4xAA split to motors, or not. Use external regulator if more current needed. Pros: portable, high-current, recommended config. Cons: Need to aquire 6xAAs and case.
+
+Other, worse options:
+- LiPo to motors and Arduino/external regulator.
+- 4xAA/LiPo/9V to motors, USB power bank to raspi.
+
+Motor calculations:
+https://www.digikey.com/en/products/detail/seeed-technology-co-ltd/114090050/10385087
+Assume maybe 150rpm loaded speed at 5V. Wheel is ~60mm diameter. Max speed is (60*pi)mm/rev*150rev/min to m/s = ~0.5m/s At 7.2V, 0.65m/s. Extrapolating, maybe 0.8m/s@9V and 1m/s@12V ?
