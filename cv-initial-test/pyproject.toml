@@ -12,7 +12,3 @@ dependencies = [
 
 [project.scripts]
 cv-initial-test = "cv_initial_test:main"
-
-[build-system]
-requires = ["uv_build>=0.12.21,<0.13.0"]
-build-backend = "uv_build"
