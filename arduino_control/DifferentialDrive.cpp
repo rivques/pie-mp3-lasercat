@@ -31,8 +31,8 @@ void DifferentialDrive::run_motors(float left_speed, float right_speed) {
     m_right_motor->run(RELEASE);
   }
 
-  if (left_speed_val > 255); left_speed_val = 255;
-  if (right_speed_val > 255); right_speed_val = 255;
+  if (left_speed_val > 255) left_speed_val = 255;
+  if (right_speed_val > 255) right_speed_val = 255; 
 
   m_left_motor->setSpeed(left_speed_val);
   m_right_motor->setSpeed(right_speed_val);
