@@ -16,7 +16,7 @@ def main():
     picam2 = Picamera2()
     print("opening camera...")
     # open camera for 640x480 RGB, rotated 180 degrees
-    config = picam2.create_preview_configuration(main={"size": (640, 480), "format": "RGB888"}, transform=Transform(hflip=True, vflip=True))
+    config = picam2.create_preview_configuration(main={"size": (640, 480), "format": "RGB888"}, raw={"size": (1640, 1232)}, transform=Transform(hflip=True, vflip=True))
     picam2.configure(config)
     picam2.set_controls({"ExposureTime": 19000, "AnalogueGain": 10.0}) # exposure is microseconds, 59us to 5.8s, analogue gain is 1.0 to 10.6
     if ser.in_waiting > 0: # clear the input buffer before we start the camera
@@ -46,7 +46,7 @@ def main():
                 ser.write(b"NONE\n")
 
             apply_overlay(picam2, circles, biggest_circle) # draw circles on the diagnostic feed
-            time.sleep(0.1) # don't overwhelm the arduino with too many messages
+            
             print(f"{ser.in_waiting=}, {ser.out_waiting=}") # if these get big then something's wrong
             # echo arduino serial
             while ser.in_waiting > 0:
@@ -54,6 +54,8 @@ def main():
                 if line:
                     print(f"Arduino: {line}")
 
+            while time.monotonic() - last_frame < 0.05: # limit to 20 fps
+                time.sleep(0.01)
 
             current_time = time.monotonic()
             print(f"Frame rate: {1.0 / (current_time - last_frame):.2f} fps")
@@ -79,7 +81,7 @@ def px_to_laser_polar(x, y):
     IMG_WIDTH = 640
     IMG_HEIGHT = 480
     # cad parameters
-    CAM_TILT = -17 # degrees above horizon - ADJUST IF CHANGED ON ROBOT
+    CAM_TILT = -30 # degrees above horizon - ADJUST IF CHANGED ON ROBOT
     CAM_HEIGHT = 104 # mm above ground
     CAM_FORWARD = 53 # mm forward of center of rotation
 
