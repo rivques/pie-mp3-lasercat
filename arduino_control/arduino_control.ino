@@ -11,7 +11,7 @@ struct TargetPoint {
 
 int left_motor_port = 4;
 int right_motor_port = 3;
-float wheel_radius = 0.065; // m
+float wheel_radius = 0.065/2; // m
 float wheel_base = 0.17; //m
 float max_angular_velocity = 15.7; // from data sheet and estimation
 
@@ -19,17 +19,17 @@ Adafruit_MotorShield MotorShield = Adafruit_MotorShield(); //Initialize motor sh
 Adafruit_DCMotor *left_motor = MotorShield.getMotor(left_motor_port);
 Adafruit_DCMotor *right_motor = MotorShield.getMotor(right_motor_port);
 
-DifferentialDrive drive = DifferentialDrive(left_motor, right_motor, wheel_base, wheel_radius, max_angular_velocity, 5); // Initialize helper class
+DifferentialDrive drive = DifferentialDrive(left_motor, right_motor, wheel_base, wheel_radius, max_angular_velocity, 0); // Initialize helper class
 
 TargetPoint target; //stores target info
 unsigned long timeout = 500; //milis
 unsigned long disconnect_timeout = 2000; // millis
 
 // Start with just a P (for heading and distance) loop. will add I and D if needed.
-float kP_heading = -2; // Values set through trial and error 
-float kP_distance = 13;
+float kP_heading = -0.15; // Values set through trial and error 
+float kP_distance = 0.5 / 0.75;
 
-float search_lin_vel = 0.5; // m/sec
+float search_lin_vel = 0.2; // m/sec
 
 bool enabled = false;
 
@@ -66,9 +66,9 @@ void chase_behavior(TargetPoint target) {
   float linear_velocity;
   float angular_velocity;
   angular_velocity = kP_heading*target.heading; //Calculate velocties to command with P loops
-  linear_velocity = kP_distance*target.distance;
-  // Serial.print("cmd_vel_ang: "); Serial.println(angular_velocity);
-  // Serial.print("cmd_vel_lin: "); Serial.println(linear_velocity);
+  linear_velocity = 0.5;
+  Serial.print("cmd_vel_ang: "); Serial.println(angular_velocity);
+  Serial.print("cmd_vel_lin: "); Serial.println(linear_velocity);
   drive.drive(linear_velocity, angular_velocity);
 }
 
@@ -107,7 +107,7 @@ void get_target() {
       drive.stop(); 
       enabled = false;
     } else if (buffer == "NONE") { //No target found
-      Serial.println("NONE - " + String(millis() - target.time) + "ms since last pos");
+      // Serial.println("NONE - " + String(millis() - target.time) + "ms since last pos");
       if ((millis() - target.time) > timeout) { //if it has been too long we forget about the last point
         // Serial.print("Timeout");
         target.exists = false;
