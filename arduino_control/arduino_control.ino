@@ -13,20 +13,20 @@ int left_motor_port = 4;
 int right_motor_port = 3;
 float wheel_radius = 0.065; // m
 float wheel_base = 0.17; //m
-float max_angular_velocity = 15.7; //TODO set this
+float max_angular_velocity = 15.7; // from data sheet and estimation
 
-Adafruit_MotorShield MotorShield = Adafruit_MotorShield();
+Adafruit_MotorShield MotorShield = Adafruit_MotorShield(); //Initialize motor shield
 Adafruit_DCMotor *left_motor = MotorShield.getMotor(left_motor_port);
 Adafruit_DCMotor *right_motor = MotorShield.getMotor(right_motor_port);
 
-DifferentialDrive drive = DifferentialDrive(left_motor, right_motor, wheel_base, wheel_radius, max_angular_velocity, 0);
+DifferentialDrive drive = DifferentialDrive(left_motor, right_motor, wheel_base, wheel_radius, max_angular_velocity, 5); // Initialize helper class
 
-TargetPoint target;
+TargetPoint target; //stores target info
 unsigned long timeout = 500; //milis
 unsigned long disconnect_timeout = 2000; // millis
 
 // Start with just a P (for heading and distance) loop. will add I and D if needed.
-float kP_heading = -2; //TODO Set values
+float kP_heading = -2; // Values set through trial and error 
 float kP_distance = 13;
 
 float search_lin_vel = 0.5; // m/sec
@@ -37,7 +37,7 @@ void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
   Serial.setTimeout(500);
-  if (!MotorShield.begin()) {
+  if (!MotorShield.begin()) { // Initialize motor shield
     Serial.println("could not initialize motor shield :(");
     while (1);
   }
@@ -45,9 +45,10 @@ void setup() {
 }
 
 void loop() {
-  get_target();
+  get_target(); // Read any sent serial data from Pi
   // Serial.println(target.exists);
   if (!enabled) {
+    // If we are disabled stop to ensure no motion. Also servse as a guard clause
     drive.stop();
     return;
   }
@@ -64,10 +65,10 @@ void chase_behavior(TargetPoint target) {
   //Behavior to run when there is a laser in sight
   float linear_velocity;
   float angular_velocity;
-  angular_velocity = kP_heading*target.heading;
+  angular_velocity = kP_heading*target.heading; //Calculate velocties to command with P loops
   linear_velocity = kP_distance*target.distance;
-  Serial.print("cmd_vel_ang: "); Serial.println(angular_velocity);
-  Serial.print("cmd_vel_lin: "); Serial.println(linear_velocity);
+  // Serial.print("cmd_vel_ang: "); Serial.println(angular_velocity);
+  // Serial.print("cmd_vel_lin: "); Serial.println(linear_velocity);
   drive.drive(linear_velocity, angular_velocity);
 }
 
@@ -88,7 +89,7 @@ void search_behavior() {
 void get_target() {
   if (Serial.available() > 0) { //check if there is serial to be read.
     // Serial.println("Got message");
-    String buffer = Serial.readStringUntil('\n'); //times out after .5s
+    String buffer = Serial.readStringUntil('\n'); //reads until we recive a new line. Times out after .5s
     // Serial.println(buffer);
     if (isDigit(buffer.charAt(0))) { //If we are getting a number this is a target point
       // Serial.print("number");
@@ -98,8 +99,8 @@ void get_target() {
       String angle_str = buffer.substring(comma_index+1);
       target.heading = angle_str.toFloat();
       target.distance = dist_str.toFloat() / 1000.0; //dist provided in mm converted to m
-      Serial.print("heading: "); Serial.println(target.heading);
-      Serial.print("dist: "); Serial.println(target.distance);
+      // Serial.print("heading: "); Serial.println(target.heading);
+      // Serial.print("dist: "); Serial.println(target.distance);
       target.exists = true;
       target.time = millis();
     } else if ( buffer == "SHUTDOWN") { //Python program is stopping, stop arudino code
@@ -111,10 +112,10 @@ void get_target() {
         // Serial.print("Timeout");
         target.exists = false;
       }
-      if (!target.exists) {
+      if (!target.exists) { //If the target has already timed out and we are ideling update timestamp so we dont trigger disconect
         target.time = millis();
       }
-    } else {
+    } else { // Handels any malformed messages
       target.exists = false;
     }
     
