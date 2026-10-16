@@ -5,9 +5,8 @@ from picamera2 import Picamera2, Preview
 from libcamera import Transform
 import serial
 
-
-
 def main():
+    # connect to the arduino over its expected serial port
     ser = serial.Serial('/dev/ttyACM0', 9600, timeout=1, write_timeout=1)
     time.sleep(0.5) # this resets the arduino, wait for it to come back up
     for _ in range(3):
@@ -20,33 +19,35 @@ def main():
     config = picam2.create_preview_configuration(main={"size": (640, 480), "format": "RGB888"}, transform=Transform(hflip=True, vflip=True))
     picam2.configure(config)
     picam2.set_controls({"ExposureTime": 19000, "AnalogueGain": 10.0}) # exposure is microseconds, 59us to 5.8s, analogue gain is 1.0 to 10.6
-    if ser.in_waiting > 0:
+    if ser.in_waiting > 0: # clear the input buffer before we start the camera
         line = ser.readline().decode().strip()
         if line:
             print(f"Arduino: {line}")
-    # also consider controlling ColourGains if it's not consistent
-    print(picam2.camera_controls)
-    picam2.start(show_preview=Preview.QT)
+
+    print(picam2.camera_controls) # contains info on how much gain, etc. is available
+    picam2.start(show_preview=Preview.QT) # this takes like 30 seconds
     print("starting main loop")
     last_frame = time.monotonic()
     try:
         while True:
-            array = picam2.capture_array("main")
-            # print(f"Got array of shape {array.shape} and dtype {array.dtype}")
-            circles, biggest_circle = find_green_points(array)
+            array = picam2.capture_array("main") # get an image from the camera
+            circles, biggest_circle = find_green_points(array) # try to detect the laser in it
 
             if biggest_circle is not None:
+                # laser detected!
                 x, y = biggest_circle[0]
-                angle, distance = px_to_laser_polar(x, y)
+                angle, distance = px_to_laser_polar(x, y) # convert into robot frame
                 print(f"biggest circle at ({x:.1f}, {y:.1f}) -> angle {angle:.1f} deg, distance {distance:.1f} mm")
-                ser.write(f"{distance:.1f},{angle:.1f}\n".encode())
+                ser.write(f"{distance:.1f},{angle:.1f}\n".encode()) # send info to the arduino
             else:
+                # no laser seen
                 print("no bright points found")
+                # tell the arduino about it
                 ser.write(b"NONE\n")
 
-            apply_overlay(picam2, circles, biggest_circle)
+            apply_overlay(picam2, circles, biggest_circle) # draw circles on the diagnostic feed
             time.sleep(0.1) # don't overwhelm the arduino with too many messages
-            print(f"{ser.in_waiting=}, {ser.out_waiting=}")
+            print(f"{ser.in_waiting=}, {ser.out_waiting=}") # if these get big then something's wrong
             # echo arduino serial
             while ser.in_waiting > 0:
                 line = ser.readline().decode().strip()
@@ -58,11 +59,12 @@ def main():
             print(f"Frame rate: {1.0 / (current_time - last_frame):.2f} fps")
             last_frame = current_time
     finally:
+        # if we have an error or KeyboardInterrupt, tell the arduino to fully stop the motors
         if ser.is_open:
             ser.write(b"SHUTDOWN\n") # tell the arduino that the program is shutting down
             ser.close()
         else:
-            print("Count not send SHUTDONW, serial port already closed")
+            print("Cound not send SHUTDOWN, serial port already closed")
 
 def px_to_laser_polar(x, y):
     """
@@ -101,6 +103,12 @@ def px_to_laser_polar(x, y):
     return laser_angle, laser_distance
 
 def find_green_points(array):
+    """
+    Identify the laser pointer in an image by finding the pixels that are bright green,
+    then finding the biggest contour of those.
+    Input: image in Numpy array form.
+    Output: List of ((x, y), radius) tuple for each circle.
+    """
     # convert to HSV
     array = cv2.cvtColor(array, cv2.COLOR_RGB2HSV)
     # threshold for green pixels
@@ -112,21 +120,12 @@ def find_green_points(array):
     circles = [cv2.minEnclosingCircle(cnt) for cnt in contours]
     biggest_circle = max(circles, key=lambda c: c[1], default=None)
     print(f"biggest circle of {len(circles)} circles: {biggest_circle}")
-    return circles,biggest_circle 
-
-def find_bright_points(array):
-    # convert to grayscale
-    array = cv2.cvtColor(array, cv2.COLOR_RGB2GRAY)
-        # threshold for all near-white pixels
-    ret, thresh = cv2.threshold(array, 240, 255, cv2.THRESH_BINARY)
-        # find contours in the thresholded image
-    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    circles = [cv2.minEnclosingCircle(cnt) for cnt in contours]
-    biggest_circle = max(circles, key=lambda c: c[1], default=None)
-    print(f"biggest circle of {len(circles)} circles: {biggest_circle}")
-    return circles,biggest_circle
+    return circles, biggest_circle
 
 def apply_overlay(picam2, circles, biggest_circle):
+    """
+    Draw the circles on the diagnostic camera frame.
+    """
     overlay = np.zeros((480, 640, 4), dtype=np.uint8)
     for circle in circles:
         color = (0, 255, 0, 255) if circle == biggest_circle else (0, 0, 255, 255)
